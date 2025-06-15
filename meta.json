@@ -2,7 +2,7 @@
   "$schema": "https://dl.viam.dev/module.schema.json",
   "module_id": "grant-dev:rf-transmitter-433mhz",
   "visibility": "public",
-  "url": "",
+  "url": "https://github.com/gmulz/433-mhz-radio-transmitter",
   "description": "Modular generic component: rf-transmitter",
   "models": [
     {
@@ -19,12 +19,7 @@
   "build": {
     "build": "make module.tar.gz",
     "setup": "make setup",
-    "path": "bin/module.tar.gz",
-    "arch": [
-      "linux/amd64",
-      "linux/arm64",
-      "darwin/arm64",
-      "windows/amd64"
-    ]
+    "path": "module.tar.gz",
+    "arch": ["linux/amd64", "linux/arm64", "darwin/arm64", "windows/amd64"]
   }
 }
