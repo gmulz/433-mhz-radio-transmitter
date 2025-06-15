@@ -14,7 +14,7 @@
   ],
   "applications": null,
   "markdown_link": "README.md",
-  "entrypoint": "bin/rf-transmitter-433mhz",
+  "entrypoint": "./bin/rf-transmitter-433mhz",
   "first_run": "",
   "build": {
     "build": "make module.tar.gz",
