@@ -31,7 +31,7 @@ func init() {
 type Config struct {
 	Board       string  `json:"board"`
 	DataPin     string  `json:"data_pin"`
-	PulseLength *string `json:"pulse_length",omitempty`
+	PulseLength *string `json:"pulse_length,omitempty"`
 }
 
 // Validate ensures all parts of the config are valid and important fields exist.
@@ -95,7 +95,7 @@ func NewRfTransmitter(ctx context.Context, deps resource.Dependencies, name reso
 		txRepeat:    10,
 	}
 	if conf.PulseLength != nil {
-		s.pulseLength = strconv.ParseInt(conf.PulseLength, 10, 64)
+		s.pulseLength, _ = strconv.ParseInt(*conf.PulseLength, 10, 64)
 	}
 	return s, nil
 }
@@ -108,7 +108,7 @@ func (s *rfTransmitter433MhzRfTransmitter) NewClientFromConn(ctx context.Context
 	panic("not implemented")
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmitWaveform(ctx context.Context, highPulses int, lowPulses int, pin board.GPIOPin) (bool, error) {
+func (s *rfTransmitter433MhzRfTransmitter) transmitWaveform(ctx context.Context, highPulses int64, lowPulses int64, pin board.GPIOPin) (bool, error) {
 	err := pin.Set(ctx, true, nil)
 	if err != nil {
 		return false, err
