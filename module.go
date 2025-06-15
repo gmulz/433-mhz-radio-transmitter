@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.viam.com/rdk/components/board"
@@ -174,16 +175,23 @@ func (s *rfTransmitter433MhzRfTransmitter) DoCommand(ctx context.Context, cmd ma
 		if !ok {
 			return map[string]interface{}{}, errors.New("code is required")
 		}
-		if codeInt, ok := code.(int64); ok {
-			success, err := s.transmit(ctx, codeInt)
-			if success {
-				return map[string]interface{}{"success": true}, nil
-			} else {
-				return map[string]interface{}{"error": err}, err
-			}
-		} else {
-			return map[string]interface{}{}, errors.New(fmt.Sprintf("code must be an integer: %v", code))
+		codeStr, ok := code.(string)
+		if !ok {
+			return map[string]interface{}{}, errors.New("code must be a string")
 		}
+
+		codeInt, err := strconv.ParseInt(codeStr, 10, 64)
+		if err != nil {
+			return map[string]interface{}{}, errors.New("could not parse code into an int")
+		}
+
+		success, err := s.transmit(ctx, codeInt)
+		if success {
+			return map[string]interface{}{"success": true}, nil
+		} else {
+			return map[string]interface{}{"error": err}, err
+		}
+
 	} else {
 		return map[string]interface{}{}, errors.New("unsupported command")
 	}
