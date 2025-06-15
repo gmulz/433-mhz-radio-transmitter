@@ -29,8 +29,9 @@ func init() {
 }
 
 type Config struct {
-	Board   string `json:"board"`
-	DataPin string `json:"data_pin"`
+	Board       string  `json:"board"`
+	DataPin     string  `json:"data_pin"`
+	PulseLength *string `json:"pulse_length",omitempty`
 }
 
 // Validate ensures all parts of the config are valid and important fields exist.
@@ -60,7 +61,7 @@ type rfTransmitter433MhzRfTransmitter struct {
 	cancelCtx  context.Context
 	cancelFunc func()
 
-	pulseLength int
+	pulseLength int64
 	txRepeat    int
 }
 
@@ -92,6 +93,9 @@ func NewRfTransmitter(ctx context.Context, deps resource.Dependencies, name reso
 		board:       b.(board.Board),
 		pulseLength: 350, // microseconds
 		txRepeat:    10,
+	}
+	if conf.PulseLength != nil {
+		s.pulseLength = strconv.ParseInt(conf.PulseLength, 10, 64)
 	}
 	return s, nil
 }
