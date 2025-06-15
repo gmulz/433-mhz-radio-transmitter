@@ -111,7 +111,7 @@ func (s *rfTransmitter433MhzRfTransmitter) NewClientFromConn(ctx context.Context
 func (s *rfTransmitter433MhzRfTransmitter) sleepFor(ns int64) {
 	wake := time.Now().Add(time.Duration(ns))
 	for wake.After(time.Now()) {
-		time.Sleep(time.Duration(0))
+
 	}
 }
 
