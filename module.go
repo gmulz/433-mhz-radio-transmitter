@@ -172,9 +172,11 @@ func (s *rfTransmitter433MhzRfTransmitter) DoCommand(ctx context.Context, cmd ma
 			return map[string]interface{}{}, errors.New("code is required")
 		}
 		if codeInt, ok := code.(int); ok {
-			success, _ := s.transmit(ctx, codeInt)
+			success, err := s.transmit(ctx, codeInt)
 			if success {
 				return map[string]interface{}{"success": true}, nil
+			} else {
+				return map[string]interface{}{"error": err}, err
 			}
 		}
 		return map[string]interface{}{}, errors.New("code must be an integer")
