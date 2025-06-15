@@ -129,7 +129,7 @@ func (s *rfTransmitter433MhzRfTransmitter) transmitSync(ctx context.Context, pin
 	return s.transmitWaveform(ctx, 1, 31, pin)
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code int) (bool, error) {
+func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code int64) (bool, error) {
 	pin, err := s.board.GPIOPinByName(s.cfg.DataPin)
 	if err != nil {
 		return false, err
@@ -174,7 +174,7 @@ func (s *rfTransmitter433MhzRfTransmitter) DoCommand(ctx context.Context, cmd ma
 		if !ok {
 			return map[string]interface{}{}, errors.New("code is required")
 		}
-		if codeInt, ok := code.(int); ok {
+		if codeInt, ok := code.(int64); ok {
 			success, err := s.transmit(ctx, codeInt)
 			if success {
 				return map[string]interface{}{"success": true}, nil
