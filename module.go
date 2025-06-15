@@ -165,7 +165,10 @@ func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code in
 }
 
 func (s *rfTransmitter433MhzRfTransmitter) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
-	cmdName := cmd["command"]
+	cmdName, ok := cmd["command"]
+	if !ok {
+		return map[string]interface{}{}, errors.New("command is required")
+	}
 	if cmdName == "transmit" {
 		code, ok := cmd["code"]
 		if !ok {
@@ -178,10 +181,12 @@ func (s *rfTransmitter433MhzRfTransmitter) DoCommand(ctx context.Context, cmd ma
 			} else {
 				return map[string]interface{}{"error": err}, err
 			}
+		} else {
+			return map[string]interface{}{}, errors.New(fmt.Sprintf("code must be an integer: %v", code))
 		}
-		return map[string]interface{}{}, errors.New("code must be an integer")
+	} else {
+		return map[string]interface{}{}, errors.New("unsupported command")
 	}
-	return map[string]interface{}{}, errors.New("command is required")
 }
 
 func (s *rfTransmitter433MhzRfTransmitter) Close(context.Context) error {
