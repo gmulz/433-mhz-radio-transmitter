@@ -108,17 +108,24 @@ func (s *rfTransmitter433MhzRfTransmitter) NewClientFromConn(ctx context.Context
 	panic("not implemented")
 }
 
+func (s *rfTransmitter433MhzRfTransmitter) sleepFor(ns int64) {
+	wake := time.Now().Add(time.Duration(ns))
+	for wake.After(time.Now()) {
+		time.Sleep(time.Duration(0))
+	}
+}
+
 func (s *rfTransmitter433MhzRfTransmitter) transmitWaveform(ctx context.Context, highPulses int64, lowPulses int64, pin board.GPIOPin) (bool, error) {
 	err := pin.Set(ctx, true, nil)
 	if err != nil {
 		return false, err
 	}
-	time.Sleep(time.Duration(highPulses * s.pulseLength * 1000)) // nanoseconds
+	s.sleepFor(highPulses * s.pulseLength * 1000) // nanoseconds
 	err = pin.Set(ctx, false, nil)
 	if err != nil {
 		return false, err
 	}
-	time.Sleep(time.Duration(lowPulses * s.pulseLength * 1000)) // nanoseconds
+	s.sleepFor(lowPulses * s.pulseLength * 1000) // nanoseconds
 	return true, nil
 }
 
