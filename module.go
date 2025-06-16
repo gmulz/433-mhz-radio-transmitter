@@ -248,12 +248,13 @@ func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code in
 				}
 			}
 		}
+		// transmit sync
+		_, err := s.transmitSync(ctx, s.pin)
+		if err != nil {
+			return false, err
+		}
 	}
-	// transmit sync
-	_, err := s.transmitSync(ctx, s.pin)
-	if err != nil {
-		return false, err
-	}
+
 	s.logger.CInfo(ctx, "Transmission successful")
 	return true, nil
 }
