@@ -1,5 +1,5 @@
 
-GO_BUILD_ENV :=
+GO_BUILD_ENV := GOOS=linux GOARCH=arm GOARM=6
 GO_BUILD_FLAGS :=
 MODULE_BINARY := bin/rf-transmitter-433mhz
 

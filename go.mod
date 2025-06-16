@@ -5,6 +5,7 @@ go 1.23.8
 toolchain go1.24.4
 
 require (
+	github.com/mkch/gpio v0.0.0-20190919032813-8327cd97d95e
 	go.viam.com/rdk v0.79.0
 	go.viam.com/utils v0.1.146
 )
@@ -155,4 +156,6 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
+	periph.io/x/conn/v3 v3.7.0 // indirect
+	periph.io/x/host/v3 v3.8.1-0.20230331112814-9f0d9f7d76db // indirect
 )

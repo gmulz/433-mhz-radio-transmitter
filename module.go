@@ -1,3 +1,5 @@
+//go:build linux
+
 package rftransmitter433mhz
 
 import (
@@ -5,9 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/mkch/gpio"
 	"go.viam.com/rdk/components/board"
+	gl "go.viam.com/rdk/components/board/genericlinux"
 	"go.viam.com/rdk/components/generic"
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
@@ -19,6 +24,8 @@ var (
 	RfTransmitter    = resource.NewModel("grant-dev", "rf-transmitter-433mhz", "rf-transmitter")
 	errUnimplemented = errors.New("unimplemented")
 )
+
+const noPin = 0xFFFFFFFF
 
 func init() {
 	resource.RegisterComponent(generic.API, RfTransmitter,
@@ -34,11 +41,43 @@ type Config struct {
 	PulseLength *string `json:"pulse_length,omitempty"`
 }
 
+type GPIOPinDirect struct {
+	devicePath string
+	offset     uint32
+
+	line *gpio.Line
+
+	mu     sync.Mutex
+	logger logging.Logger
+}
+
+func (pin *GPIOPinDirect) wrapError(err error) error {
+	return errors.Join(err, fmt.Errorf("from GPIO device %s line %d", pin.devicePath, pin.offset))
+}
+
+func (pin *GPIOPinDirect) Set(ctx context.Context, isHigh bool, extra map[string]interface{}) error {
+	pin.mu.Lock()
+	defer pin.mu.Unlock()
+
+	var value byte
+	if isHigh {
+		value = 1
+	} else {
+		value = 0
+	}
+
+	if err := pin.line.SetValue(value); err != nil {
+		return pin.wrapError(err)
+	}
+	return nil
+}
+
 // Validate ensures all parts of the config are valid and important fields exist.
 // Returns implicit required (first return) and optional (second return) dependencies based on the config.
 // The path is the JSON path in your robot's config (not the `Config` struct) to the
 // resource being validated; e.g. "components.0".
 func (cfg *Config) Validate(path string) ([]string, []string, error) {
+
 	if cfg.Board == "" {
 		return nil, nil, utils.NewConfigValidationFieldRequiredError(path, "board")
 	}
@@ -63,6 +102,7 @@ type rfTransmitter433MhzRfTransmitter struct {
 
 	pulseLength int64
 	txRepeat    int
+	pin         *GPIOPinDirect
 }
 
 func newRfTransmitter433MhzRfTransmitter(ctx context.Context, deps resource.Dependencies, rawConf resource.Config, logger logging.Logger) (resource.Resource, error) {
@@ -84,6 +124,20 @@ func NewRfTransmitter(ctx context.Context, deps resource.Dependencies, name reso
 		return nil, err
 	}
 
+	gpioMappings, err := gl.GetGPIOBoardMappings(b.Name().Name, boardInfoMappings)
+	mapping := gpioMappings[conf.DataPin]
+
+	// pin, err := s.board.GPIOPinByName(conf.DataPin)
+	pin := createGPIOPinDirect(mapping, logger)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if pin.offset == noPin {
+		return nil, errors.New("data pin invalid")
+	}
+
 	s := &rfTransmitter433MhzRfTransmitter{
 		name:        name,
 		logger:      logger,
@@ -93,10 +147,28 @@ func NewRfTransmitter(ctx context.Context, deps resource.Dependencies, name reso
 		board:       b.(board.Board),
 		pulseLength: 350, // microseconds
 		txRepeat:    10,
+		pin:         pin,
 	}
 	if conf.PulseLength != nil {
 		s.pulseLength, _ = strconv.ParseInt(*conf.PulseLength, 10, 64)
 	}
+
+	if s.pin.line == nil {
+		chip, err := gpio.OpenChip(pin.devicePath)
+		if err != nil {
+			return nil, s.pin.wrapError(err)
+		}
+		defer utils.UncheckedErrorFunc(chip.Close)
+
+		direction := gpio.Output
+
+		line, err := chip.OpenLine(pin.offset, 0, direction, "viam-gpio")
+		if err != nil {
+			return nil, s.pin.wrapError(err)
+		}
+		pin.line = line
+	}
+
 	return s, nil
 }
 
@@ -109,13 +181,14 @@ func (s *rfTransmitter433MhzRfTransmitter) NewClientFromConn(ctx context.Context
 }
 
 func (s *rfTransmitter433MhzRfTransmitter) sleepFor(ns int64) {
-	wake := time.Now().Add(time.Duration(ns))
-	for wake.After(time.Now()) {
-
+	start := time.Now()
+	duration := time.Duration(ns)
+	for time.Since(start) < duration {
+		// busy wait
 	}
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmitWaveform(ctx context.Context, highPulses int64, lowPulses int64, pin board.GPIOPin) (bool, error) {
+func (s *rfTransmitter433MhzRfTransmitter) transmitWaveform(ctx context.Context, highPulses int64, lowPulses int64, pin *GPIOPinDirect) (bool, error) {
 	err := pin.Set(ctx, true, nil)
 	if err != nil {
 		return false, err
@@ -129,23 +202,28 @@ func (s *rfTransmitter433MhzRfTransmitter) transmitWaveform(ctx context.Context,
 	return true, nil
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmitZero(ctx context.Context, pin board.GPIOPin) (bool, error) {
+func (s *rfTransmitter433MhzRfTransmitter) transmitZero(ctx context.Context, pin *GPIOPinDirect) (bool, error) {
 	return s.transmitWaveform(ctx, 1, 3, pin)
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmitOne(ctx context.Context, pin board.GPIOPin) (bool, error) {
+func (s *rfTransmitter433MhzRfTransmitter) transmitOne(ctx context.Context, pin *GPIOPinDirect) (bool, error) {
 	return s.transmitWaveform(ctx, 3, 1, pin)
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmitSync(ctx context.Context, pin board.GPIOPin) (bool, error) {
+func (s *rfTransmitter433MhzRfTransmitter) transmitSync(ctx context.Context, pin *GPIOPinDirect) (bool, error) {
 	return s.transmitWaveform(ctx, 1, 31, pin)
 }
 
-func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code int64) (bool, error) {
-	pin, err := s.board.GPIOPinByName(s.cfg.DataPin)
-	if err != nil {
-		return false, err
+func createGPIOPinDirect(mapping gl.GPIOBoardMapping, logger logging.Logger) *GPIOPinDirect {
+	pin := GPIOPinDirect{
+		devicePath: mapping.GPIOChipDev,
+		offset:     uint32(mapping.GPIO),
+		logger:     logger,
 	}
+	return &pin
+}
+
+func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code int64) (bool, error) {
 
 	rawCode := fmt.Sprintf("%024b", code)
 
@@ -154,13 +232,13 @@ func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code in
 	for i := 0; i < s.txRepeat; i++ {
 		for _, char := range rawCode {
 			if char == '0' {
-				_, err := s.transmitZero(ctx, pin)
+				_, err := s.transmitZero(ctx, s.pin)
 				if err != nil {
 					return false, err
 				}
 			}
 			if char == '1' {
-				_, err := s.transmitOne(ctx, pin)
+				_, err := s.transmitOne(ctx, s.pin)
 				if err != nil {
 					return false, err
 				}
@@ -168,7 +246,7 @@ func (s *rfTransmitter433MhzRfTransmitter) transmit(ctx context.Context, code in
 		}
 	}
 	// transmit sync
-	_, err = s.transmitSync(ctx, pin)
+	_, err := s.transmitSync(ctx, s.pin)
 	if err != nil {
 		return false, err
 	}
