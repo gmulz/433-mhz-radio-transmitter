@@ -124,7 +124,10 @@ func NewRfTransmitter(ctx context.Context, deps resource.Dependencies, name reso
 		return nil, err
 	}
 
-	gpioMappings, err := gl.GetGPIOBoardMappings(b.Name().Name, boardInfoMappings)
+	gpioMappings, err := gl.GetGPIOBoardMappings(b.Name().API.SubtypeName, boardInfoMappings)
+	if err != nil {
+		return nil, err
+	}
 	mapping := gpioMappings[conf.DataPin]
 
 	// pin, err := s.board.GPIOPinByName(conf.DataPin)
